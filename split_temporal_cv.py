@@ -17,29 +17,20 @@ def create_temporal_folds_with_cold_start(df, n_splits=5):
 
     df_sorted = df.sort_values(by='timestamp').reset_index(drop=True)
 
-    # --- CHANGE 1: Split into n_splits + 1 chunks ---
     chunks = np.array_split(df_sorted, n_splits + 1)
 
     final_df_folds = []
-    cold_start_flags_df = []
 
-    # --- CHANGE 2: Loop n_splits times ---
     for i in range(1, n_splits + 1):
         train_df = pd.concat(chunks[:i])
         test_df = chunks[i].copy()
-
-        train_users = set(train_df['userid'].unique())
-        
-        is_cold_start = ~test_df['userid'].isin(train_users)
-        
         final_df_folds.append((train_df, test_df))
-        cold_start_flags_df.append(is_cold_start)
 
     train_arrays_list = []
     test_arrays_list = []
     cold_start_flag_list = []
 
-    for (train_df, test_df), flags in zip(final_df_folds, cold_start_flags_df):
+    for (train_df, test_df) in final_df_folds:
         train_matrix = np.zeros((n_users, n_items))
         test_matrix = np.zeros((n_users, n_items))
 
@@ -52,6 +43,11 @@ def create_temporal_folds_with_cold_start(df, n_splits=5):
         train_arrays_list.append(train_matrix)
         test_arrays_list.append(test_matrix)
         
-        cold_start_flag_list.append(flags.to_numpy())
+        user_cold_flags = np.ones(n_users, dtype=bool)
+        train_user_indices = train_df['user_idx'].unique()
+        if len(train_user_indices) > 0:
+            user_cold_flags[train_user_indices] = False
+        
+        cold_start_flag_list.append(user_cold_flags)
 
     return train_arrays_list, test_arrays_list, cold_start_flag_list
